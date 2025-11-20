@@ -27,10 +27,14 @@ type VerseListProps = {
   theme: Theme;
   edits: Record<number, VerseEdit[]>;
   notes: Record<number, VerseNote[]>;
+  tags: Record<number, string[]>;
+  tagSuggestions: string[];
   onEditVerse: (verse: Verse) => void;
   onAddNote: (verse: Verse) => void;
   onEditNote: (verse: Verse, noteId: string) => void;
   onRemoveNote: (verseId: number, noteId: string) => void;
+  onAddTag: (verse: Verse) => void;
+  onRemoveTag: (verseId: number, tag: string) => void;
 };
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -103,10 +107,14 @@ export function VerseList({
   theme,
   edits,
   notes,
+  tags,
+  tagSuggestions,
   onEditVerse,
   onAddNote,
   onEditNote,
   onRemoveNote,
+  onAddTag,
+  onRemoveTag,
 }: VerseListProps) {
   const renderVerse = ({ item }: { item: Verse }) => (
     <View
@@ -126,12 +134,36 @@ export function VerseList({
           <TouchableOpacity style={styles.iconButton} onPress={() => onAddNote(item)}>
             <Feather name="file-plus" size={16} color={theme.colors.sectionTitle} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={() => onAddTag(item)}>
+            <Feather name="tag" size={16} color={theme.colors.sectionTitle} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={() => onEditVerse(item)}>
             <Feather name="edit-3" size={16} color={theme.colors.sectionTitle} />
           </TouchableOpacity>
         </View>
       </View>
       {renderVerseText(item.verse, edits[item.id] ?? [], theme)}
+      {(tags[item.id] ?? []).length > 0 && (
+        <View style={styles.tagList}>
+          {(tags[item.id] ?? []).map((tag) => (
+            <View
+              key={tag}
+              style={[
+                styles.tagChip,
+                {
+                  backgroundColor: theme.colors.surfaceAlt,
+                  borderColor: theme.colors.chipBorder,
+                },
+              ]}
+            >
+              <Text style={[styles.tagText, { color: theme.colors.text }]}>{tag}</Text>
+              <TouchableOpacity onPress={() => onRemoveTag(item.id, tag)}>
+                <Text style={styles.tagRemove}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
       {(notes[item.id] ?? []).map((note) => (
         <View
           key={note.id}
@@ -227,6 +259,30 @@ const styles = StyleSheet.create({
   },
   verseText: {
     lineHeight: 20,
+  },
+  tagList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagRemove: {
+    color: '#f87171',
+    fontSize: 12,
+    fontWeight: '700',
   },
   strikeText: {
     textDecorationLine: 'line-through',

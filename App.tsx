@@ -18,11 +18,15 @@ export default function App() {
   const [translation, setTranslation] = useState(POPULAR_TRANSLATIONS[0].value);
   const [verseEdits, setVerseEdits] = useState<Record<number, VerseEdit[]>>({});
   const [verseNotes, setVerseNotes] = useState<Record<number, VerseNote[]>>({});
+  const [verseTags, setVerseTags] = useState<Record<number, string[]>>({});
   const [editingVerse, setEditingVerse] = useState<Verse | null>(null);
   const [editOriginal, setEditOriginal] = useState('');
   const [editReplacement, setEditReplacement] = useState('');
   const [noteContext, setNoteContext] = useState<{ verse: Verse; noteId?: string } | null>(null);
   const [noteText, setNoteText] = useState('');
+  const [tagVerse, setTagVerse] = useState<Verse | null>(null);
+  const [tagText, setTagText] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
 
   const {
     books,
@@ -187,6 +191,64 @@ export default function App() {
     setNoteText('');
   };
 
+  const handleAddTag = (verse: Verse) => {
+    setTagVerse(verse);
+    setTagText('');
+  };
+
+  const handleSaveTag = () => {
+    if (!tagVerse) {
+      return;
+    }
+
+    const trimmed = tagText.trim();
+    if (!trimmed) {
+      setTagVerse(null);
+      setTagText('');
+      return;
+    }
+
+    setVerseTags((prev) => {
+      const current = prev[tagVerse.id] ?? [];
+      if (current.some((tag) => tag.toLowerCase() === trimmed.toLowerCase())) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [tagVerse.id]: [...current, trimmed],
+      };
+    });
+
+    setTagSuggestions((prev) => {
+      if (prev.some((tag) => tag.toLowerCase() === trimmed.toLowerCase())) {
+        return prev;
+      }
+      return [trimmed, ...prev].slice(0, 10);
+    });
+
+    setTagVerse(null);
+    setTagText('');
+  };
+
+  const handleRemoveTag = (verseId: number, tag: string) => {
+    setVerseTags((prev) => {
+      const current = prev[verseId] ?? [];
+      const filtered = current.filter((item) => item !== tag);
+      const next = { ...prev };
+      if (filtered.length === 0) {
+        delete next[verseId];
+      } else {
+        next[verseId] = filtered;
+      }
+      return next;
+    });
+  };
+
+  const handleCancelTag = () => {
+    setTagVerse(null);
+    setTagText('');
+  };
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -229,10 +291,14 @@ export default function App() {
             theme={theme}
             edits={verseEdits}
             notes={verseNotes}
+            tags={verseTags}
+            tagSuggestions={tagSuggestions}
             onEditVerse={handleRequestEdit}
             onAddNote={handleAddNote}
             onEditNote={handleEditNote}
             onRemoveNote={handleRemoveNote}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
           />
         </View>
       </SafeAreaView>
@@ -345,6 +411,58 @@ export default function App() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal transparent visible={!!tagVerse} animationType="fade" onRequestClose={handleCancelTag}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.editOverlay}
+        >
+          <View style={[styles.tagCardModal, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.editTitle, { color: theme.colors.sectionTitle }]}>
+              {tagVerse ? `Tags for verse ${tagVerse.verseId}` : 'Add tag'}
+            </Text>
+            <Text style={[styles.editSubtitle, { color: theme.colors.textMuted }]}>
+              Create short keywords to categorize this verse.
+            </Text>
+            <TextInput
+              style={[
+                styles.tagInput,
+                { borderColor: theme.colors.chipBorder, color: theme.colors.text },
+              ]}
+              placeholder="Enter tag"
+              placeholderTextColor={theme.colors.textMuted}
+              value={tagText}
+              onChangeText={setTagText}
+            />
+            {tagSuggestions.length > 0 && (
+              <View style={styles.tagSuggestions}>
+                <Text style={[styles.tagSuggestionLabel, { color: theme.colors.textMuted }]}>
+                  Quick add
+                </Text>
+                <View style={styles.tagSuggestionList}>
+                  {tagSuggestions.map((suggestion) => (
+                    <TouchableOpacity
+                      key={suggestion}
+                      style={styles.tagSuggestionChip}
+                      onPress={() => setTagText(suggestion)}
+                    >
+                      <Text style={styles.tagSuggestionText}>{suggestion}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            <View style={styles.tagActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={handleCancelTag}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveTag}>
+                <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaProvider>
   );
 }
@@ -382,6 +500,11 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
   },
+  tagCardModal: {
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+  },
   editTitle: {
     fontSize: 20,
     fontWeight: '700',
@@ -415,6 +538,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 120,
     textAlignVertical: 'top',
+  },
+  tagInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+  },
+  tagSuggestions: {
+    marginTop: 8,
+    gap: 6,
+  },
+  tagSuggestionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagSuggestionList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tagSuggestionChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.4)',
+  },
+  tagSuggestionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
   },
   currentEdits: {
     borderWidth: 1,
@@ -474,6 +629,11 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#0f172a',
     fontWeight: '700',
+  },
+  tagActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
   noteActions: {
     marginTop: 4,
