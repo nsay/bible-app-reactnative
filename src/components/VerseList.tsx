@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Verse } from '../api/bible';
 import { Theme } from '../theme/theme';
 
@@ -15,15 +16,21 @@ export type VerseEdit = {
   replacement: string;
 };
 
+export type VerseNote = {
+  id: string;
+  text: string;
+};
+
 type VerseListProps = {
   verses: Verse[];
   loading: boolean;
   theme: Theme;
   edits: Record<number, VerseEdit[]>;
-  notes: Record<number, string>;
+  notes: Record<number, VerseNote[]>;
   onEditVerse: (verse: Verse) => void;
-  onNoteVerse: (verse: Verse) => void;
-  onRemoveNote: (verseId: number) => void;
+  onAddNote: (verse: Verse) => void;
+  onEditNote: (verse: Verse, noteId: string) => void;
+  onRemoveNote: (verseId: number, noteId: string) => void;
 };
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -97,7 +104,8 @@ export function VerseList({
   edits,
   notes,
   onEditVerse,
-  onNoteVerse,
+  onAddNote,
+  onEditNote,
   onRemoveNote,
 }: VerseListProps) {
   const renderVerse = ({ item }: { item: Verse }) => (
@@ -115,38 +123,35 @@ export function VerseList({
           {item.verseId}
         </Text>
         <View style={styles.verseActions}>
-          {notes[item.id] && <Text style={styles.noteBadge}>Note</Text>}
-          {(edits[item.id]?.length ?? 0) > 0 && <Text style={styles.editedBadge}>Edited</Text>}
-          <TouchableOpacity onPress={() => onNoteVerse(item)}>
-            <Text style={styles.noteLink}>{notes[item.id] ? 'Edit note' : 'Add note'}</Text>
+          <TouchableOpacity style={styles.iconButton} onPress={() => onAddNote(item)}>
+            <Feather name="file-plus" size={16} color={theme.colors.sectionTitle} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onEditVerse(item)}>
-            <Text style={styles.editLink}>Edit</Text>
+          <TouchableOpacity style={styles.iconButton} onPress={() => onEditVerse(item)}>
+            <Feather name="edit-3" size={16} color={theme.colors.sectionTitle} />
           </TouchableOpacity>
         </View>
       </View>
       {renderVerseText(item.verse, edits[item.id] ?? [], theme)}
-          {notes[item.id] && (
-            <View
-              style={[
-                styles.noteCard,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: theme.colors.chipBorder,
-                },
-              ]}
-            >
-              <View style={styles.noteHeader}>
-                <Text style={[styles.noteLabel, { color: theme.colors.sectionTitle }]}>
-                  Your note
-                </Text>
-                <TouchableOpacity onPress={() => onRemoveNote(item.id)}>
-                  <Text style={styles.removeNote}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.noteText, { color: theme.colors.text }]}>{notes[item.id]}</Text>
-            </View>
-          )}
+      {(notes[item.id] ?? []).map((note) => (
+        <View
+          key={note.id}
+          style={[
+            styles.noteCard,
+            {
+              backgroundColor: theme.colors.surfaceAlt,
+              borderColor: theme.colors.chipBorder,
+            },
+          ]}
+        >
+          <View style={styles.noteHeader}>
+            <Text style={[styles.noteLabel, { color: theme.colors.sectionTitle }]}>Your note</Text>
+            <TouchableOpacity style={styles.noteIconButton} onPress={() => onEditNote(item, note.id)}>
+              <Feather name="edit-3" size={14} color={theme.colors.sectionTitle} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.noteText, { color: theme.colors.text }]}>{note.text}</Text>
+        </View>
+      ))}
     </View>
   );
 
@@ -212,25 +217,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  noteLink: {
-    color: '#fbbf24',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  editLink: {
-    color: '#60a5fa',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  editedBadge: {
-    color: '#22d3ee',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  noteBadge: {
-    color: '#fbbf24',
-    fontSize: 12,
-    fontWeight: '600',
+  iconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   verseText: {
     lineHeight: 20,
@@ -259,10 +252,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  removeNote: {
-    fontSize: 12,
-    color: '#f87171',
-    fontWeight: '600',
+  noteIconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   noteText: {
     lineHeight: 18,

@@ -21,10 +21,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 0,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 0,
     fontWeight: '600',
   },
 });

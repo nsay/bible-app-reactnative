@@ -45,7 +45,7 @@ export function ChapterPicker({
       >
         <Text style={[styles.triggerLabel, { color: theme.colors.textMuted }]}>Current Chapter</Text>
         <Text style={[styles.triggerValue, { color: theme.colors.sectionTitle }]}>
-          Chapter {selectedChapter}
+          {selectedChapter}
         </Text>
       </TouchableOpacity>
 

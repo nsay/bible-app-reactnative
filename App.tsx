@@ -4,7 +4,7 @@ import { Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, K
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from './src/components/ScreenHeader';
-import { VerseList, VerseEdit } from './src/components/VerseList';
+import { VerseList, VerseEdit, VerseNote } from './src/components/VerseList';
 import { ErrorBanner } from './src/components/ErrorBanner';
 import { BookPicker } from './src/components/BookPicker';
 import { ChapterPicker } from './src/components/ChapterPicker';
@@ -17,11 +17,11 @@ export default function App() {
   const { theme, toggleTheme } = useBibleTheme();
   const [translation, setTranslation] = useState(POPULAR_TRANSLATIONS[0].value);
   const [verseEdits, setVerseEdits] = useState<Record<number, VerseEdit[]>>({});
-  const [verseNotes, setVerseNotes] = useState<Record<number, string>>({});
+  const [verseNotes, setVerseNotes] = useState<Record<number, VerseNote[]>>({});
   const [editingVerse, setEditingVerse] = useState<Verse | null>(null);
   const [editOriginal, setEditOriginal] = useState('');
   const [editReplacement, setEditReplacement] = useState('');
-  const [noteVerse, setNoteVerse] = useState<Verse | null>(null);
+  const [noteContext, setNoteContext] = useState<{ verse: Verse; noteId?: string } | null>(null);
   const [noteText, setNoteText] = useState('');
 
   const {
@@ -105,42 +105,85 @@ export default function App() {
 
   const editingVerseEdits = editingVerse ? verseEdits[editingVerse.id] ?? [] : [];
 
-  const handleRequestNote = (verse: Verse) => {
-    setNoteVerse(verse);
-    setNoteText(verseNotes[verse.id] ?? '');
+  const handleAddNote = (verse: Verse) => {
+    setNoteContext({ verse });
+    setNoteText('');
+  };
+
+  const handleEditNote = (verse: Verse, noteId: string) => {
+    const existing = verseNotes[verse.id]?.find((note) => note.id === noteId);
+    setNoteContext({ verse, noteId });
+    setNoteText(existing?.text ?? '');
   };
 
   const handleSaveNote = () => {
-    if (!noteVerse) {
+    if (!noteContext) {
       return;
     }
 
     const trimmed = noteText.trim();
 
-    setVerseNotes((prev) => {
-      const next = { ...prev };
-      if (!trimmed) {
-        delete next[noteVerse.id];
-      } else {
-        next[noteVerse.id] = trimmed;
+    if (!trimmed) {
+      if (noteContext.noteId) {
+        handleRemoveNote(noteContext.verse.id, noteContext.noteId);
       }
-      return next;
+      setNoteContext(null);
+      setNoteText('');
+      return;
+    }
+
+    setVerseNotes((prev) => {
+      const current = prev[noteContext.verse.id] ?? [];
+      if (noteContext.noteId) {
+        return {
+          ...prev,
+          [noteContext.verse.id]: current.map((note) =>
+            note.id === noteContext.noteId ? { ...note, text: trimmed } : note,
+          ),
+        };
+      }
+
+      const nextNote: VerseNote = {
+        id: `${Date.now()}`,
+        text: trimmed,
+      };
+
+      return {
+        ...prev,
+        [noteContext.verse.id]: [...current, nextNote],
+      };
     });
 
-    setNoteVerse(null);
+    setNoteContext(null);
     setNoteText('');
   };
 
-  const handleRemoveNote = (verseId: number) => {
+  const handleRemoveNote = (verseId: number, noteId: string) => {
     setVerseNotes((prev) => {
+      const current = prev[verseId] ?? [];
+      const filtered = current.filter((note) => note.id !== noteId);
       const next = { ...prev };
-      delete next[verseId];
+      if (filtered.length === 0) {
+        delete next[verseId];
+      } else {
+        next[verseId] = filtered;
+      }
       return next;
     });
   };
 
   const handleCancelNote = () => {
-    setNoteVerse(null);
+    setNoteContext(null);
+    setNoteText('');
+  };
+
+  const handleRemoveNoteInModal = () => {
+    if (!noteContext?.noteId) {
+      return;
+    }
+
+    handleRemoveNote(noteContext.verse.id, noteContext.noteId);
+    setNoteContext(null);
     setNoteText('');
   };
 
@@ -187,7 +230,8 @@ export default function App() {
             edits={verseEdits}
             notes={verseNotes}
             onEditVerse={handleRequestEdit}
-            onNoteVerse={handleRequestNote}
+            onAddNote={handleAddNote}
+            onEditNote={handleEditNote}
             onRemoveNote={handleRemoveNote}
           />
         </View>
@@ -260,14 +304,14 @@ export default function App() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal transparent visible={!!noteVerse} animationType="fade" onRequestClose={handleCancelNote}>
+      <Modal transparent visible={!!noteContext} animationType="fade" onRequestClose={handleCancelNote}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.editOverlay}
         >
           <View style={[styles.noteCardModal, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.editTitle, { color: theme.colors.sectionTitle }]}>
-              {noteVerse ? `Verse ${noteVerse.verseId} note` : 'Add note'}
+              {noteContext ? `Verse ${noteContext.verse.verseId} note` : 'Add note'}
             </Text>
             <Text style={[styles.editSubtitle, { color: theme.colors.textMuted }]}>
               Jot down what stands out to you in this verse.
@@ -283,13 +327,20 @@ export default function App() {
               multiline
               onChangeText={setNoteText}
             />
-            <View style={styles.editActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancelNote}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSaveNote}>
-                <Text style={styles.saveText}>Save</Text>
-              </TouchableOpacity>
+            <View style={styles.noteActions}>
+              {noteContext?.noteId && (
+                <TouchableOpacity style={styles.removeButton} onPress={handleRemoveNoteInModal}>
+                  <Text style={styles.removeButtonText}>Remove note</Text>
+                </TouchableOpacity>
+              )}
+              <View style={styles.noteActionButtons}>
+                <TouchableOpacity style={styles.cancelButton} onPress={handleCancelNote}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveButton} onPress={handleSaveNote}>
+                  <Text style={styles.saveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -423,5 +474,26 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#0f172a',
     fontWeight: '700',
+  },
+  noteActions: {
+    marginTop: 4,
+    gap: 12,
+  },
+  noteActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  removeButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(248, 113, 113, 0.15)',
+  },
+  removeButtonText: {
+    color: '#f87171',
+    fontWeight: '600',
+    fontSize: 13,
   },
 });
