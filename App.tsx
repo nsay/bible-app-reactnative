@@ -77,6 +77,7 @@ export default function App() {
     const grouped: Record<string, {
       verseId: number;
       chapterId: number;
+      bookId: number;
       bookName?: string;
       verseText?: string;
       notes: VerseNote[];
@@ -92,6 +93,7 @@ export default function App() {
         const existing = grouped[key] ?? {
           verseId: note.ref?.verseId ?? verseId,
           chapterId: note.ref?.chapterId ?? 0,
+          bookId: note.ref?.bookId ?? 0,
           bookName: note.ref?.bookName,
           verseText: note.ref?.text,
           notes: [],
@@ -105,13 +107,13 @@ export default function App() {
     });
 
     return Object.values(grouped).sort((a, b) => {
-      if (a.bookName === b.bookName) {
+      if (a.bookId === b.bookId) {
         if (a.chapterId === b.chapterId) {
           return a.verseId - b.verseId;
         }
         return a.chapterId - b.chapterId;
       }
-      return (a.bookName ?? '').localeCompare(b.bookName ?? '');
+      return a.bookId - b.bookId;
     });
   }, [verseNotes]);
 
