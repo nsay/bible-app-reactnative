@@ -51,7 +51,21 @@ export default function App() {
       onPanResponderRelease: (_, gesture) => {
         if (sidebarOpen || notesPanelOpen || tagsPanelOpen) return;
         const shouldOpen = gesture.dx > sidebarWidth * 0.3;
-        setSidebarOpen(shouldOpen);
+        const target = shouldOpen ? sidebarWidth : 0;
+        Animated.parallel([
+          Animated.timing(contentAnim, {
+            toValue: target,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(sidebarAnim, {
+            toValue: shouldOpen ? 0 : -sidebarWidth,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setSidebarOpen(shouldOpen);
+        });
       },
     }),
   ).current;
@@ -91,7 +105,7 @@ export default function App() {
       duration: 250,
       useNativeDriver: true,
     }).start();
-  }, [sidebarOpen, sidebarAnim, sidebarWidth]);
+  }, [sidebarOpen, sidebarAnim, sidebarWidth, contentAnim]);
 
   useEffect(() => {
     Animated.timing(notesPanelAnim, {
