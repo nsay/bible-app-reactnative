@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
+import { Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Animated, Dimensions, Switch } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from './src/components/ScreenHeader';
@@ -343,14 +343,15 @@ export default function App() {
         ))}
 
         <View style={styles.sidebarDivider} />
-        <TouchableOpacity
-          style={[styles.themeToggle, { borderColor: theme.colors.chipBorder }]}
-          onPress={toggleTheme}
-        >
-          <Text style={[styles.toggleEmoji, { color: theme.colors.sectionTitle }]}>
-            {theme.mode === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.themeRow}>
+          <Text style={[styles.sidebarItemText, { color: theme.colors.text }]}>Dark Mode</Text>
+          <Switch
+            value={theme.mode === 'dark'}
+            onValueChange={toggleTheme}
+            thumbColor={theme.mode === 'dark' ? '#0f172a' : '#f8fafc'}
+            trackColor={{ false: '#cbd5f5', true: '#22d3ee' }}
+          />
+        </View>
       </Animated.View>
 
       <Modal transparent visible={!!editingVerse} animationType="fade" onRequestClose={handleCancelEdit}>
@@ -653,6 +654,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  sidebarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sidebarContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    borderRightWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  sidebarTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  sidebarItem: {
+    paddingVertical: 12,
+  },
+  sidebarItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   editActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -742,5 +775,10 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(148, 163, 184, 0.3)',
     marginVertical: 16,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
 });

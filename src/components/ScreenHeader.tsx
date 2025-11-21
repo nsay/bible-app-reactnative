@@ -22,10 +22,10 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   return (
     <View style={styles.headerRow}>
-      <TouchableOpacity style={styles.menuButton} onPress={onToggleMenu}>
-        <Text style={styles.menuIcon}>☰</Text>
-      </TouchableOpacity>
-      <Text style={[styles.appTitle, { color: theme.colors.title }]} numberOfLines={1}>
+        <TouchableOpacity style={styles.menuButton} onPress={onToggleMenu}>
+          <Text style={[styles.menuIcon, { color: theme.colors.sectionTitle }]}>☰</Text>
+        </TouchableOpacity>
+        <Text style={[styles.appTitle, { color: theme.colors.title }]} numberOfLines={1}>
         {title}
       </Text>
 
