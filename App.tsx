@@ -672,6 +672,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 12,
+    marginBottom: 12,
   },
   pickerColumn: {
     flex: 1,
