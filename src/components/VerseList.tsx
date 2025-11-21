@@ -19,6 +19,13 @@ export type VerseEdit = {
 export type VerseNote = {
   id: string;
   text: string;
+  ref?: {
+    verseId: number;
+    chapterId: number;
+    bookId: number;
+    bookName: string;
+    text?: string;
+  };
 };
 
 type VerseListProps = {

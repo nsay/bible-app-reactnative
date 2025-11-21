@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Animated, Dimensions, Switch } from 'react-native';
+import { Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Animated, Dimensions, Switch, ScrollView } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from './src/components/ScreenHeader';
@@ -30,6 +30,9 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const sidebarWidth = Math.min(280, Dimensions.get('window').width * 0.75);
   const sidebarAnim = useRef(new Animated.Value(-sidebarWidth)).current;
+  const [notesPanelOpen, setNotesPanelOpen] = useState(false);
+  const notesPanelHeight = Dimensions.get('window').height;
+  const notesPanelAnim = useRef(new Animated.Value(notesPanelHeight)).current;
 
   const {
     books,
@@ -61,6 +64,56 @@ export default function App() {
       useNativeDriver: true,
     }).start();
   }, [sidebarOpen, sidebarAnim, sidebarWidth]);
+
+  useEffect(() => {
+    Animated.timing(notesPanelAnim, {
+      toValue: notesPanelOpen ? 0 : notesPanelHeight,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [notesPanelOpen, notesPanelAnim, notesPanelHeight]);
+
+  const allNotes = useMemo(() => {
+    const grouped: Record<string, {
+      verseId: number;
+      chapterId: number;
+      bookName?: string;
+      verseText?: string;
+      notes: VerseNote[];
+    }> = {};
+
+    Object.entries(verseNotes).forEach(([verseIdStr, verseNoteList]) => {
+      const verseId = Number(verseIdStr);
+      verseNoteList?.forEach((note) => {
+        const key = note.ref
+          ? `${note.ref.bookId}-${note.ref.chapterId}-${note.ref.verseId}`
+          : `unknown-${verseId}`;
+
+        const existing = grouped[key] ?? {
+          verseId: note.ref?.verseId ?? verseId,
+          chapterId: note.ref?.chapterId ?? 0,
+          bookName: note.ref?.bookName,
+          verseText: note.ref?.text,
+          notes: [],
+        };
+
+        grouped[key] = {
+          ...existing,
+          notes: [...existing.notes, note],
+        };
+      });
+    });
+
+    return Object.values(grouped).sort((a, b) => {
+      if (a.bookName === b.bookName) {
+        if (a.chapterId === b.chapterId) {
+          return a.verseId - b.verseId;
+        }
+        return a.chapterId - b.chapterId;
+      }
+      return (a.bookName ?? '').localeCompare(b.bookName ?? '');
+    });
+  }, [verseNotes]);
 
   const handleRequestEdit = (verse: Verse) => {
     setEditingVerse(verse);
@@ -161,6 +214,13 @@ export default function App() {
       const nextNote: VerseNote = {
         id: `${Date.now()}`,
         text: trimmed,
+        ref: {
+          verseId: noteContext.verse.verseId,
+          chapterId: noteContext.verse.chapterId,
+          bookId: noteContext.verse.book.id,
+          bookName: noteContext.verse.book.name,
+          text: noteContext.verse.verse,
+        },
       };
 
       return {
@@ -333,7 +393,7 @@ export default function App() {
         <View style={styles.sidebarHeader}>
           <Text style={[styles.sidebarTitle, { color: theme.colors.sectionTitle }]}>Menu</Text>
           <TouchableOpacity onPress={() => setSidebarOpen(false)}>
-            <Text style={styles.closeText}>×</Text>
+            <Text style={[styles.closeText, { color: theme.colors.sectionTitle }]}>×</Text>
           </TouchableOpacity>
         </View>
         {['Home', 'Bookmarks', 'Settings'].map((item) => (
@@ -341,6 +401,16 @@ export default function App() {
             <Text style={[styles.sidebarItemText, { color: theme.colors.text }]}>{item}</Text>
           </TouchableOpacity>
         ))}
+
+        <TouchableOpacity
+          style={styles.sidebarItem}
+          onPress={() => {
+            setSidebarOpen(false);
+            setNotesPanelOpen(true);
+          }}
+        >
+          <Text style={[styles.sidebarItemText, { color: theme.colors.text }]}>Notes</Text>
+        </TouchableOpacity>
 
         <View style={styles.sidebarDivider} />
         <View style={styles.themeRow}>
@@ -514,6 +584,77 @@ export default function App() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {notesPanelOpen && (
+        <TouchableOpacity
+          style={styles.notesOverlay}
+          activeOpacity={1}
+          onPress={() => setNotesPanelOpen(false)}
+        />
+      )}
+      <Animated.View
+        style={[
+          styles.notesPanel,
+          {
+            height: notesPanelHeight,
+            transform: [{ translateY: notesPanelAnim }],
+            backgroundColor: theme.colors.surface,
+          },
+        ]}
+      >
+        <View style={styles.notesHeader}>
+          <Text style={[styles.notesTitle, { color: theme.colors.sectionTitle }]}>All Notes</Text>
+          <TouchableOpacity onPress={() => setNotesPanelOpen(false)}>
+            <Text style={[styles.closeText, { color: theme.colors.sectionTitle }]}>×</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {allNotes.length === 0 ? (
+            <Text style={[styles.emptyNotesText, { color: theme.colors.textMuted }]}>
+              You have no notes yet.
+            </Text>
+          ) : (
+            allNotes.map((verseNoteGroup) => (
+              <View
+                key={`${verseNoteGroup.bookName}-${verseNoteGroup.chapterId}-${verseNoteGroup.verseId}`}
+                style={[
+                  styles.notesCard,
+                  {
+                    borderColor: theme.colors.verseCardBorder,
+                    backgroundColor: theme.colors.verseCardBg,
+                  },
+                ]}
+              >
+                <Text style={[styles.notesVerseRef, { color: theme.colors.verseNumber }]}>
+                  {verseNoteGroup.bookName ?? 'Verse'} {verseNoteGroup.chapterId ?? ''}:{verseNoteGroup.verseId}
+                </Text>
+                <Text style={[styles.notesVerseText, { color: theme.colors.verseText }]}> 
+                  {verseNoteGroup.verseText}
+                </Text>
+                {verseNoteGroup.notes.map((note) => (
+                  <View
+                    key={note.id}
+                    style={[
+                      styles.notesNoteCard,
+                      {
+                        backgroundColor: theme.colors.surfaceAlt,
+                        borderColor: theme.colors.chipBorder,
+                      },
+                    ]}
+                  >
+                    <View style={styles.notesNoteHeader}>
+                      <Text style={[styles.notesNoteLabel, { color: theme.colors.sectionTitle }]}>Your note</Text>
+                    </View>
+                    <Text style={[styles.notesNoteText, { color: theme.colors.text }]}>
+                      {note.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </Animated.View>
     </SafeAreaProvider>
   );
 }
@@ -654,38 +795,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  sidebarOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  sidebarContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    borderRightWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
-  },
-  sidebarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  sidebarTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  sidebarItem: {
-    paddingVertical: 12,
-  },
-  sidebarItemText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   editActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -739,6 +848,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
+  notesNoteCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 6,
+  },
+  notesNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  notesNoteLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  notesNoteText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   sidebarOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -780,5 +909,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  closeText: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  notesOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  notesPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    top: 0,
+    paddingTop: 40,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  notesTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  notesCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+  },
+  notesVerseRef: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  noteBody: {
+    marginTop: 6,
+    gap: 4,
+  },
+  notesText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  notesVerseText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  emptyNotesText: {
+    textAlign: 'center',
+    marginTop: 12,
+    fontSize: 14,
   },
 });
