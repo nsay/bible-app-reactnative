@@ -13,6 +13,9 @@ import { useBibleData } from './src/hooks/useBibleData';
 import { useBibleTheme } from './src/hooks/useBibleTheme';
 import { POPULAR_TRANSLATIONS } from './src/constants/translations';
 import { Verse } from './src/api/bible';
+import { buildVerseEditNodes } from './src/utils/verseEdits';
+
+const ACTION_SHEET_HEIGHT = 320;
 
 export default function App() {
   const { theme, toggleTheme } = useBibleTheme();
@@ -38,18 +41,22 @@ export default function App() {
   const [tagsPanelOpen, setTagsPanelOpen] = useState(false);
   const tagsPanelHeight = Dimensions.get('window').height;
   const tagsPanelAnim = useRef(new Animated.Value(tagsPanelHeight)).current;
+  const [actionSheetVerse, setActionSheetVerse] = useState<Verse | null>(null);
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const actionSheetAnim = useRef(new Animated.Value(0)).current;
+  const interactionLockRef = useRef(false);
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) =>
-        !sidebarOpen && !notesPanelOpen && !tagsPanelOpen && gesture.dx > 10 && Math.abs(gesture.dy) < 20,
+        !interactionLockRef.current && gesture.dx > 10 && Math.abs(gesture.dy) < 20,
       onPanResponderMove: (_, gesture) => {
-        if (sidebarOpen || notesPanelOpen || tagsPanelOpen) return;
+        if (interactionLockRef.current) return;
         const offset = Math.min(Math.max(0, gesture.dx), sidebarWidth);
         contentAnim.setValue(offset);
         sidebarAnim.setValue(offset - sidebarWidth);
       },
       onPanResponderRelease: (_, gesture) => {
-        if (sidebarOpen || notesPanelOpen || tagsPanelOpen) return;
+        if (interactionLockRef.current) return;
         const shouldOpen = gesture.dx > sidebarWidth * 0.3;
         const target = shouldOpen ? sidebarWidth : 0;
         Animated.parallel([
@@ -92,6 +99,10 @@ export default function App() {
   const headerSubtitle = selectedTranslationOption
     ? `Reading ${selectedTranslationOption.label}`
     : 'Browse books, chapters, and verses.';
+  const actionSheetTranslateY = actionSheetAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [ACTION_SHEET_HEIGHT, 0],
+  });
 
   useEffect(() => {
     Animated.timing(sidebarAnim, {
@@ -122,6 +133,11 @@ export default function App() {
       useNativeDriver: true,
     }).start();
   }, [tagsPanelOpen, tagsPanelAnim, tagsPanelHeight]);
+
+  useEffect(() => {
+    interactionLockRef.current =
+      sidebarOpen || notesPanelOpen || tagsPanelOpen || actionSheetVisible;
+  }, [sidebarOpen, notesPanelOpen, tagsPanelOpen, actionSheetVisible]);
 
   const allNotes = useMemo(() => {
     const grouped: Record<string, {
@@ -430,6 +446,80 @@ export default function App() {
     });
   }, [verseTags, verseNotes]);
 
+  const handleOpenVerseActions = (verse: Verse) => {
+    if (actionSheetVisible) {
+      setActionSheetVerse(verse);
+      return;
+    }
+    setActionSheetVerse(verse);
+    setActionSheetVisible(true);
+    actionSheetAnim.setValue(0);
+    Animated.timing(actionSheetAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCloseVerseActions = (afterClose?: () => void) => {
+    if (!actionSheetVisible) {
+      setActionSheetVerse(null);
+      afterClose?.();
+      return;
+    }
+
+    Animated.timing(actionSheetAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setActionSheetVisible(false);
+      setActionSheetVerse(null);
+      afterClose?.();
+    });
+  };
+
+  const handleVerseActionSelect = (action: 'note' | 'tag' | 'edit') => {
+    if (!actionSheetVerse) {
+      return;
+    }
+
+    const verse = actionSheetVerse;
+    handleCloseVerseActions(() => {
+      if (action === 'note') {
+        handleAddNote(verse);
+      } else if (action === 'tag') {
+        handleAddTag(verse);
+      } else {
+        handleRequestEdit(verse);
+      }
+    });
+  };
+
+  const renderActionSheetVerseText = (verse: Verse) => {
+    const nodes = buildVerseEditNodes(verse.verse, verseEdits[verse.id] ?? []);
+
+    return (
+      <Text
+        style={[styles.actionSheetVerseText, { color: theme.colors.text }]}
+        numberOfLines={3}
+      >
+        {nodes.map((node, index) =>
+          typeof node === 'string' ? (
+            <Text key={`sheet-text-${index}`} style={{ color: theme.colors.text }}>
+              {node}
+            </Text>
+          ) : (
+            <Text key={`sheet-edit-${index}`}>
+              <Text style={styles.actionSheetStrike}>{node.original}</Text>
+              <Text style={styles.actionSheetReplacement}> {node.replacement}</Text>
+            </Text>
+          ),
+        )}
+      </Text>
+    );
+  };
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -476,12 +566,10 @@ export default function App() {
             notes={verseNotes}
             tags={verseTags}
             tagSuggestions={tagSuggestions}
-            onEditVerse={handleRequestEdit}
-            onAddNote={handleAddNote}
             onEditNote={handleEditNote}
             onRemoveNote={handleRemoveNote}
-            onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
+            onOpenActions={handleOpenVerseActions}
           />
         </Animated.View>
       </SafeAreaView>
@@ -712,6 +800,78 @@ export default function App() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {actionSheetVisible && (
+        <View style={styles.actionSheetContainer} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.actionSheetOverlay}
+            activeOpacity={1}
+            onPress={() => handleCloseVerseActions()}
+          />
+          <Animated.View
+            style={[
+              styles.actionSheet,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.verseCardBorder,
+                transform: [{ translateY: actionSheetTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.actionSheetHandle} />
+            {actionSheetVerse && (
+              <>
+                <View style={styles.actionSheetHeader}>
+                  <Text style={[styles.actionSheetVerseRef, { color: theme.colors.sectionTitle }]}>
+                    {actionSheetVerse.book.name} {actionSheetVerse.chapterId}:{actionSheetVerse.verseId}
+                  </Text>
+                  {renderActionSheetVerseText(actionSheetVerse)}
+                </View>
+                <View style={styles.actionSheetActions}>
+                  {[
+                    { key: 'note', label: 'Add Note', icon: 'file-plus' },
+                    { key: 'tag', label: 'Add Tag', icon: 'tag' },
+                    { key: 'edit', label: 'Edit Verse', icon: 'edit-3' },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={[
+                        styles.actionSheetButton,
+                        {
+                          borderColor: theme.colors.verseCardBorder,
+                          backgroundColor: theme.colors.verseCardBg,
+                        },
+                      ]}
+                      activeOpacity={0.9}
+                      onPress={() => handleVerseActionSelect(item.key as 'note' | 'tag' | 'edit')}
+                    >
+                      <View style={styles.actionSheetButtonContent}>
+                        <View
+                          style={[
+                            styles.actionSheetButtonIcon,
+                            {
+                              backgroundColor:
+                                theme.mode === 'dark'
+                                  ? 'rgba(148, 163, 184, 0.2)'
+                                  : 'rgba(15, 23, 42, 0.08)',
+                            },
+                          ]}
+                        >
+                          <Feather name={item.icon as any} size={18} color={theme.colors.sectionTitle} />
+                        </View>
+                        <Text style={[styles.actionSheetButtonText, { color: theme.colors.text }]}>
+                          {item.label}
+                        </Text>
+                      </View>
+                      <Feather name="chevron-right" size={18} color={theme.colors.textMuted} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </Animated.View>
+        </View>
+      )}
 
       {notesPanelOpen && (
         <TouchableOpacity
@@ -1226,5 +1386,77 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     fontSize: 14,
+  },
+  actionSheetContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  actionSheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  actionSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 30,
+    borderTopWidth: 1,
+  },
+  actionSheetHandle: {
+    width: 48,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(148, 163, 184, 0.6)',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  actionSheetHeader: {
+    marginBottom: 12,
+    gap: 4,
+  },
+  actionSheetVerseRef: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  actionSheetVerseText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  actionSheetActions: {
+    gap: 8,
+  },
+  actionSheetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  actionSheetButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionSheetButtonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  actionSheetStrike: {
+    textDecorationLine: 'line-through',
+    color: '#f87171',
+  },
+  actionSheetReplacement: {
+    color: '#34d399',
+    fontWeight: '600',
   },
 });

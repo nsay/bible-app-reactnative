@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,36 +10,10 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { Verse } from '../api/bible';
 import { Theme } from '../theme/theme';
+import { VerseEdit, VerseNote, VerseTag } from '../types/verses';
+import { buildVerseEditNodes } from '../utils/verseEdits';
 
-export type VerseEdit = {
-  id: string;
-  original: string;
-  replacement: string;
-};
-
-export type VerseNote = {
-  id: string;
-  text: string;
-  ref?: {
-    verseId: number;
-    chapterId: number;
-    bookId: number;
-    bookName: string;
-    text?: string;
-  };
-};
-
-export type VerseTag = {
-  id: string;
-  value: string;
-  ref?: {
-    verseId: number;
-    chapterId: number;
-    bookId: number;
-    bookName: string;
-    text?: string;
-  };
-};
+export type { VerseEdit, VerseNote, VerseTag } from '../types/verses';
 
 type VerseListProps = {
   verses: Verse[];
@@ -48,59 +23,14 @@ type VerseListProps = {
   notes: Record<number, VerseNote[]>;
   tags: Record<number, VerseTag[]>;
   tagSuggestions: string[];
-  onEditVerse: (verse: Verse) => void;
-  onAddNote: (verse: Verse) => void;
   onEditNote: (verse: Verse, noteId: string) => void;
   onRemoveNote: (verseId: number, noteId: string) => void;
-  onAddTag: (verse: Verse) => void;
   onRemoveTag: (verseId: number, tagId: string) => void;
+  onOpenActions: (verse: Verse) => void;
 };
 
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 const renderVerseText = (text: string, verseEdits: VerseEdit[], theme: Theme) => {
-  if (!verseEdits.length) {
-    return <Text style={[styles.verseText, { color: theme.colors.verseText }]}>{text}</Text>;
-  }
-
-  type Node = string | { original: string; replacement: string };
-  let nodes: Node[] = [text];
-
-  verseEdits.forEach((edit) => {
-    const original = edit.original.trim();
-    if (!original) {
-      return;
-    }
-    const regex = new RegExp(escapeRegExp(original), 'gi');
-    const nextNodes: Node[] = [];
-
-    nodes.forEach((node) => {
-      if (typeof node !== 'string') {
-        nextNodes.push(node);
-        return;
-      }
-
-      let lastIndex = 0;
-      let match;
-      while ((match = regex.exec(node)) !== null) {
-        if (match.index > lastIndex) {
-          nextNodes.push(node.slice(lastIndex, match.index));
-        }
-
-        nextNodes.push({
-          original: match[0],
-          replacement: edit.replacement,
-        });
-        lastIndex = match.index + match[0].length;
-      }
-
-      if (lastIndex < node.length) {
-        nextNodes.push(node.slice(lastIndex));
-      }
-    });
-
-    nodes = nextNodes;
-  });
+  const nodes = buildVerseEditNodes(text, verseEdits);
 
   return (
     <Text style={[styles.verseText, { color: theme.colors.verseText }]}>
@@ -128,38 +58,27 @@ export function VerseList({
   notes,
   tags,
   tagSuggestions,
-  onEditVerse,
-  onAddNote,
   onEditNote,
   onRemoveNote,
-  onAddTag,
   onRemoveTag,
+  onOpenActions,
 }: VerseListProps) {
   const renderVerse = ({ item }: { item: Verse }) => (
-    <View
-      style={[
+    <Pressable
+      onPress={() => onOpenActions(item)}
+      style={({ pressed }) => [
         styles.verseCard,
         {
           backgroundColor: theme.colors.verseCardBg,
           borderColor: theme.colors.verseCardBorder,
         },
+        pressed && styles.verseCardPressed,
       ]}
     >
       <View style={styles.verseHeader}>
         <Text style={[styles.verseNumber, { color: theme.colors.verseNumber }]}>
           {item.verseId}
         </Text>
-        <View style={styles.verseActions}>
-          <TouchableOpacity style={styles.iconButton} onPress={() => onAddNote(item)}>
-            <Feather name="file-plus" size={16} color={theme.colors.sectionTitle} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={() => onAddTag(item)}>
-            <Feather name="tag" size={16} color={theme.colors.sectionTitle} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={() => onEditVerse(item)}>
-            <Feather name="edit-3" size={16} color={theme.colors.sectionTitle} />
-          </TouchableOpacity>
-        </View>
       </View>
       {renderVerseText(item.verse, edits[item.id] ?? [], theme)}
       {(tags[item.id] ?? []).length > 0 && (
@@ -176,7 +95,12 @@ export function VerseList({
               ]}
             >
               <Text style={[styles.tagText, { color: theme.colors.text }]}>{tag.value}</Text>
-              <TouchableOpacity onPress={() => onRemoveTag(item.id, tag.id)}>
+              <TouchableOpacity
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onRemoveTag(item.id, tag.id);
+                }}
+              >
                 <Text style={styles.tagRemove}>×</Text>
               </TouchableOpacity>
             </View>
@@ -196,14 +120,20 @@ export function VerseList({
         >
           <View style={styles.noteHeader}>
             <Text style={[styles.noteLabel, { color: theme.colors.sectionTitle }]}>Your note</Text>
-            <TouchableOpacity style={styles.noteIconButton} onPress={() => onEditNote(item, note.id)}>
+            <TouchableOpacity
+              style={styles.noteIconButton}
+              onPress={(event) => {
+                event.stopPropagation();
+                onEditNote(item, note.id);
+              }}
+            >
               <Feather name="edit-3" size={14} color={theme.colors.sectionTitle} />
             </TouchableOpacity>
           </View>
           <Text style={[styles.noteText, { color: theme.colors.text }]}>{note.text}</Text>
         </View>
       ))}
-    </View>
+    </Pressable>
   );
 
   if (loading && verses.length === 0) {
@@ -253,6 +183,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
   },
+  verseCardPressed: {
+    opacity: 0.95,
+  },
   verseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -262,19 +195,6 @@ const styles = StyleSheet.create({
   verseNumber: {
     fontWeight: '700',
     marginBottom: 6,
-  },
-  verseActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 999,
-    backgroundColor: 'rgba(148, 163, 184, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   verseText: {
     lineHeight: 20,
