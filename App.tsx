@@ -14,6 +14,8 @@ import { useBibleTheme } from './src/hooks/useBibleTheme';
 import { POPULAR_TRANSLATIONS } from './src/constants/translations';
 import { Verse } from './src/api/bible';
 import { buildVerseEditNodes } from './src/utils/verseEdits';
+import { NotesPanel, NoteGroup } from './src/components/NotesPanel';
+import { TagsPanel, TagGroup } from './src/components/TagsPanel';
 
 const ACTION_SHEET_HEIGHT = 320;
 
@@ -139,15 +141,8 @@ export default function App() {
       sidebarOpen || notesPanelOpen || tagsPanelOpen || actionSheetVisible;
   }, [sidebarOpen, notesPanelOpen, tagsPanelOpen, actionSheetVisible]);
 
-  const allNotes = useMemo(() => {
-    const grouped: Record<string, {
-      verseId: number;
-      chapterId: number;
-      bookId: number;
-      bookName?: string;
-      verseText?: string;
-      notes: VerseNote[];
-    }> = {};
+  const allNotes = useMemo<NoteGroup[]>(() => {
+    const grouped: Record<string, NoteGroup> = {};
 
     Object.entries(verseNotes).forEach(([verseIdStr, verseNoteList]) => {
       const verseId = Number(verseIdStr);
@@ -399,16 +394,8 @@ export default function App() {
     setTagText('');
   };
 
-  const allTags = useMemo(() => {
-    const grouped: Record<string, {
-      verseId: number;
-      chapterId: number;
-      bookId: number;
-      bookName?: string;
-      verseText?: string;
-      tags: VerseTag[];
-      notes: VerseNote[];
-    }> = {};
+  const allTags = useMemo<TagGroup[]>(() => {
+    const grouped: Record<string, TagGroup> = {};
 
     Object.entries(verseTags).forEach(([verseIdStr, tagList]) => {
       const verseId = Number(verseIdStr);
@@ -593,8 +580,8 @@ export default function App() {
       >
         <View style={styles.sidebarHeader}>
           <Text style={[styles.sidebarTitle, { color: theme.colors.sectionTitle }]}>Menu</Text>
-          <TouchableOpacity onPress={() => setSidebarOpen(false)}>
-            <Text style={[styles.closeText, { color: theme.colors.sectionTitle }]}>×</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={() => setSidebarOpen(false)}>
+            <Feather name="x" size={20} color={theme.colors.sectionTitle} />
           </TouchableOpacity>
         </View>
         {[
@@ -818,7 +805,6 @@ export default function App() {
               },
             ]}
           >
-            <View style={styles.actionSheetHandle} />
             {actionSheetVerse && (
               <>
                 <View style={styles.actionSheetHeader}>
@@ -873,183 +859,25 @@ export default function App() {
         </View>
       )}
 
-      {notesPanelOpen && (
-        <TouchableOpacity
-          style={styles.notesOverlay}
-          activeOpacity={1}
-          onPress={() => setNotesPanelOpen(false)}
-        />
-      )}
-      <Animated.View
-        style={[
-          styles.notesPanel,
-          {
-            height: notesPanelHeight,
-            transform: [{ translateY: notesPanelAnim }],
-            backgroundColor: theme.colors.surface,
-          },
-        ]}
-      >
-        <View style={styles.notesHeader}>
-          <Text style={[styles.notesTitle, { color: theme.colors.sectionTitle }]}>All Notes</Text>
-          <TouchableOpacity onPress={() => setNotesPanelOpen(false)}>
-            <Text style={[styles.closeText, { color: theme.colors.sectionTitle }]}>×</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {allNotes.length === 0 ? (
-            <Text style={[styles.emptyNotesText, { color: theme.colors.textMuted }]}>
-              You have no notes yet.
-            </Text>
-          ) : (
-            allNotes.map((verseNoteGroup) => (
-              <View
-                key={`${verseNoteGroup.bookName}-${verseNoteGroup.chapterId}-${verseNoteGroup.verseId}`}
-                style={[
-                  styles.notesCard,
-                  {
-                    borderColor: theme.colors.verseCardBorder,
-                    backgroundColor: theme.colors.verseCardBg,
-                  },
-                ]}
-              >
-                <Text style={[styles.notesVerseRef, { color: theme.colors.verseNumber }]}>
-                  {verseNoteGroup.bookName ?? 'Verse'} {verseNoteGroup.chapterId ?? ''}:{verseNoteGroup.verseId}
-                </Text>
-                <Text style={[styles.notesVerseText, { color: theme.colors.verseText }]}> 
-                  {verseNoteGroup.verseText}
-                </Text>
-                {(verseTags[verseNoteGroup.verseId] ?? []).length > 0 && (
-                  <View style={styles.tagRowPanel}>
-                    {(verseTags[verseNoteGroup.verseId] ?? []).map((tag) => (
-                      <View
-                        key={tag.id}
-                        style={[
-                          styles.tagChipPanel,
-                          {
-                            backgroundColor: theme.colors.surfaceAlt,
-                            borderColor: theme.colors.chipBorder,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.tagTextPanel, { color: theme.colors.text }]}>{tag.value}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                {verseNoteGroup.notes.map((note) => (
-                  <View
-                    key={note.id}
-                    style={[
-                      styles.notesNoteCard,
-                      {
-                        backgroundColor: theme.colors.surfaceAlt,
-                        borderColor: theme.colors.chipBorder,
-                      },
-                    ]}
-                  >
-                    <View style={styles.notesNoteHeader}>
-                      <Text style={[styles.notesNoteLabel, { color: theme.colors.sectionTitle }]}>Your note</Text>
-                    </View>
-                    <Text style={[styles.notesNoteText, { color: theme.colors.text }]}>
-                      {note.text}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </Animated.View>
+      <NotesPanel
+        visible={notesPanelOpen}
+        panelHeight={notesPanelHeight}
+        animation={notesPanelAnim}
+        theme={theme}
+        notes={allNotes}
+        verseTags={verseTags}
+        onClose={() => setNotesPanelOpen(false)}
+      />
 
-      {tagsPanelOpen && (
-        <TouchableOpacity
-          style={styles.notesOverlay}
-          activeOpacity={1}
-          onPress={() => setTagsPanelOpen(false)}
-        />
-      )}
-      <Animated.View
-        style={[
-          styles.notesPanel,
-          {
-            height: tagsPanelHeight,
-            transform: [{ translateY: tagsPanelAnim }],
-            backgroundColor: theme.colors.surface,
-          },
-        ]}
-      >
-        <View style={styles.notesHeader}>
-          <Text style={[styles.notesTitle, { color: theme.colors.sectionTitle }]}>All Tags</Text>
-          <TouchableOpacity onPress={() => setTagsPanelOpen(false)}>
-            <Text style={[styles.closeText, { color: theme.colors.sectionTitle }]}>×</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {allTags.length === 0 ? (
-            <Text style={[styles.emptyNotesText, { color: theme.colors.textMuted }]}>
-              You have no tags yet.
-            </Text>
-          ) : (
-            allTags.map((group) => (
-              <View
-                key={`${group.bookId}-${group.chapterId}-${group.verseId}`}
-                style={[
-                  styles.notesCard,
-                  {
-                    borderColor: theme.colors.verseCardBorder,
-                    backgroundColor: theme.colors.verseCardBg,
-                  },
-                ]}
-              >
-                <Text style={[styles.notesVerseRef, { color: theme.colors.verseNumber }]}>
-                  {group.bookName ?? 'Verse'} {group.chapterId}:{group.verseId}
-                </Text>
-                <Text style={[styles.notesVerseText, { color: theme.colors.verseText }]}> 
-                  {group.verseText}
-                </Text>
-                <View style={styles.tagRowPanel}>
-                  {group.tags.map((tag) => (
-                    <View
-                      key={tag.id}
-                      style={[
-                        styles.tagChipPanel,
-                        {
-                          backgroundColor: theme.colors.surfaceAlt,
-                          borderColor: theme.colors.chipBorder,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.tagTextPanel, { color: theme.colors.text }]}>
-                        {tag.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-                {(group.notes ?? []).map((note) => (
-                  <View
-                    key={note.id}
-                    style={[
-                      styles.notesNoteCard,
-                      {
-                        backgroundColor: theme.colors.surfaceAlt,
-                        borderColor: theme.colors.chipBorder,
-                      },
-                    ]}
-                  >
-                    <View style={styles.notesNoteHeader}>
-                      <Text style={[styles.notesNoteLabel, { color: theme.colors.sectionTitle }]}>Your note</Text>
-                    </View>
-                    <Text style={[styles.notesNoteText, { color: theme.colors.text }]}>
-                      {note.text}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </Animated.View>
+      <TagsPanel
+        visible={tagsPanelOpen}
+        panelHeight={tagsPanelHeight}
+        animation={tagsPanelAnim}
+        theme={theme}
+        tagGroups={allTags}
+        onClose={() => setTagsPanelOpen(false)}
+      />
+
     </SafeAreaProvider>
   );
 }
@@ -1248,6 +1076,15 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.3)',
+  },
   sidebarItem: {
     paddingVertical: 12,
   },
@@ -1291,102 +1128,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
-  tagRowPanel: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  tagChipPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-  },
-  tagTextPanel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  notesNoteCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 6,
-  },
-  notesNoteHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  notesNoteLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  notesNoteText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  closeText: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  notesOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  notesPanel: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: 0,
-    paddingTop: 40,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  notesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  notesTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  notesCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-  },
-  notesVerseRef: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  noteBody: {
-    marginTop: 6,
-    gap: 4,
-  },
-  notesText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  notesVerseText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  emptyNotesText: {
-    textAlign: 'center',
-    marginTop: 12,
-    fontSize: 14,
-  },
   actionSheetContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -1402,14 +1143,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 30,
     borderTopWidth: 1,
-  },
-  actionSheetHandle: {
-    width: 48,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(148, 163, 184, 0.6)',
-    alignSelf: 'center',
-    marginBottom: 14,
   },
   actionSheetHeader: {
     marginBottom: 12,

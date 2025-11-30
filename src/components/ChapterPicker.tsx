@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Theme } from '../theme/theme';
 
 type ChapterPickerProps = {
@@ -79,13 +80,12 @@ export function ChapterPicker({ chapters, selectedChapter, onSelect, theme }: Ch
                 },
               ]}
             >
-              <View style={styles.sheetHandle} />
               <View style={styles.sheetHeader}>
                 <Text style={[styles.sheetTitle, { color: theme.colors.sectionTitle }]}>Choose a Chapter</Text>
-                <TouchableOpacity style={styles.closeButton} onPress={closeSheet}>
-                  <Text style={[styles.closeText, { color: theme.colors.sectionTitle }]}>×</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={closeSheet}>
+                <Feather name="x" size={20} color={theme.colors.sectionTitle} />
+              </TouchableOpacity>
+            </View>
               <FlatList
                 data={chapters}
                 keyExtractor={(item) => String(item)}
@@ -157,19 +157,11 @@ const styles = StyleSheet.create({
   sheetContent: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 36,
+    paddingTop: 46,
     paddingHorizontal: 20,
     paddingBottom: 32,
     borderTopWidth: 1,
     maxHeight: '100%',
-  },
-  sheetHandle: {
-    width: 50,
-    height: 4,
-    borderRadius: 999,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(148, 163, 184, 0.5)',
-    marginBottom: 16,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -187,10 +179,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  closeText: {
-    fontSize: 22,
-    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.3)',
   },
   chapterGrid: {
     paddingBottom: 20,
