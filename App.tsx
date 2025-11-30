@@ -16,6 +16,7 @@ import { Verse } from './src/api/bible';
 import { buildVerseEditNodes } from './src/utils/verseEdits';
 import { NotesPanel, NoteGroup } from './src/components/NotesPanel';
 import { TagsPanel, TagGroup } from './src/components/TagsPanel';
+import { SideBar } from './src/components/SideBar/SideBar';
 
 const ACTION_SHEET_HEIGHT = 320;
 
@@ -568,64 +569,21 @@ export default function App() {
           onPress={() => setSidebarOpen(false)}
         />
       )}
-      <Animated.View
-        style={[
-          styles.sidebarContainer,
-          {
-            width: sidebarWidth,
-            transform: [{ translateX: sidebarAnim }],
-            backgroundColor: theme.colors.surface,
-          },
-        ]}
-      >
-        <View style={styles.sidebarHeader}>
-          <Text style={[styles.sidebarTitle, { color: theme.colors.sectionTitle }]}>Menu</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={() => setSidebarOpen(false)}>
-            <Feather name="x" size={20} color={theme.colors.sectionTitle} />
-          </TouchableOpacity>
-        </View>
-        {[
-          {
-            label: 'Notes',
-            icon: 'file-text',
-            onPress: () => {
-              setSidebarOpen(false);
-              setNotesPanelOpen(true);
-            },
-          },
-          {
-            label: 'Tags',
-            icon: 'tag',
-            onPress: () => {
-              setSidebarOpen(false);
-              setTagsPanelOpen(true);
-            },
-          },
-          {
-            label: 'Settings',
-            icon: 'settings',
-            onPress: () => {},
-          },
-        ].map((item) => (
-          <TouchableOpacity key={item.label} style={styles.sidebarItem} onPress={item.onPress}>
-            <View style={styles.sidebarItemRow}>
-              <Feather name={item.icon as any} size={18} color={theme.colors.text} />
-              <Text style={[styles.sidebarItemText, { color: theme.colors.text }]}>{item.label}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        <View style={styles.sidebarDivider} />
-        <View style={styles.themeRow}>
-          <Text style={[styles.sidebarItemText, { color: theme.colors.text }]}>Dark Mode</Text>
-          <Switch
-            value={theme.mode === 'dark'}
-            onValueChange={toggleTheme}
-            thumbColor={theme.mode === 'dark' ? '#0f172a' : '#f8fafc'}
-            trackColor={{ false: '#cbd5f5', true: '#22d3ee' }}
-          />
-        </View>
-      </Animated.View>
+      <SideBar
+        width={sidebarWidth}
+        theme={theme}
+        sidebarAnim={sidebarAnim}
+        onClose={() => setSidebarOpen(false)}
+        onOpenNotes={() => {
+          setSidebarOpen(false);
+          setNotesPanelOpen(true);
+        }}
+        onOpenTags={() => {
+          setSidebarOpen(false);
+          setTagsPanelOpen(true);
+        }}
+        toggleTheme={toggleTheme}
+      />
 
       <Modal transparent visible={!!editingVerse} animationType="fade" onRequestClose={handleCancelEdit}>
         <KeyboardAvoidingView
@@ -1054,58 +1012,6 @@ const styles = StyleSheet.create({
   sidebarOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  sidebarContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    borderRightWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
-  },
-  sidebarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  sidebarTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.3)',
-  },
-  sidebarItem: {
-    paddingVertical: 12,
-  },
-  sidebarItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  sidebarItemText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sidebarDivider: {
-    height: 1,
-    backgroundColor: 'rgba(148, 163, 184, 0.3)',
-    marginVertical: 16,
-  },
-  themeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
   noteActions: {
     marginTop: 4,
